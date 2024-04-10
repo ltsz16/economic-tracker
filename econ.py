@@ -4,6 +4,15 @@ from datetime import date
 import os
 import configparser
 from full_fred.fred import Fred
+from fredapi import Fred as fredapi
+import pandas as pd
+
+welcome = """
+    Welcome to the Economic Tracker
+
+    This tool is designed to pull basic economic indicators (CPI, M2, etc) and to generate a general economic forecast score
+"""
+
 
 class Lib:
     def get_api_key(self, key:str)->str:
@@ -20,16 +29,19 @@ class FREDDB:
     # https://fred.stlouisfed.org/docs/api/fred/
     lib = Lib()
     fred = Fred()
+    fred_api = fredapi()    
     menu_options = """
-    1 = GDP
-    2 = 
-    0 = Go Back
-"""
+        1 = GDP
+        2 = S&P 500
+        0 = Go Back
+    """
 
     def __init__(self) -> None:
         key = self.lib.get_api_key("fred")
         os.environ["FRED_API_KEY"] = key
         self.fred.env_api_key_found()
+        self.myfred = self.fred_api(api_key=key)
+        pd.options.display.max_colwidth = 60
 
 
     def menu(self):
@@ -40,15 +52,28 @@ class FREDDB:
                     return
                 case 1:
                     self.get_GDP()
+                case 2:
+                    self.get_sp500()
 
                                
     def get_GDP(self):
         if input("Do you just want the latest data (y/n)? ").lower() == "y":
-            data = self.fred.get_series_latest_release('GDP')
+            data = self.myfred.get_series_latest_release('GDP')
             print(data.tail())
         else:
             dt = input("For which date do you want GDP data? ")
-            print(self.fred.get_series_as_of_date('GDP', dt))
+            print(self.myfred.get_series_as_of_date('GDP', dt))
+
+
+    def get_sp500(self):
+        if input("Do you just want the latest data (y/n)? ").lower() == "y":
+            s = self.myfred.get_series('SP500', observation_start=date.today())
+            print(s.tail())
+        else:
+            dt = input("Starting on date (e.g. 2014-09-02)? ")
+            dt_end = input("Ending on date: ")
+            s = self.myfred.get_series('SP500', observation_start=dt, observation_end=dt_end)
+            print(s.tail())
 
 
 
@@ -173,3 +198,7 @@ def update():
     # create graphs
 
     # FRED
+
+if __name__ == "__main__":
+    print(welcome)
+    update()
