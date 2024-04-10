@@ -1,0 +1,3 @@
+matplotlib
+configparser
+full-fred  # https://github.com/7astro7/full_fred

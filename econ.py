@@ -1,71 +1,175 @@
 import matplotlib.pyplot as plt
 import requests
+from datetime import date
+import os
+import configparser
+from full_fred.fred import Fred
 
-def plot_cpi(cpi_values, yrs):
-    """
-    Plot the CPI values for each year for the past n years.
+class Lib:
+    def get_api_key(self, key:str)->str:
+        config = configparser.ConfigParser()
+        config.read('env.ini')
+        # Fetching the value from environment variables
+        env_value = os.getenv(key)
+        if env_value is None:
+            # If environment variable is not set, fetching it from the config file
+            env_value = config.get('API', key)
+        return env_value
 
-    Args:
-    - cpi_values (list): A list of CPI values for each year.
-    - n (int): The number of past years to plot.
-    """
-    # Extract the data for the past n years
-    years = range(2022 - n + 1, 2022 + 1)
-    cpi_values_past_n_years = cpi_values[-n:]
+class FREDDB:
+    # https://fred.stlouisfed.org/docs/api/fred/
+    lib = Lib()
+    fred = Fred()
+    menu_options = """
+    1 = GDP
+    2 = 
+    0 = Go Back
+"""
 
-    # Plotting the data
-    plt.figure(figsize=(10, 6))
-    plt.plot(years, cpi_values_past_n_years, marker='o', linestyle='-')
-    plt.title('Consumer Price Index (CPI) for the Past ' + str(yrs) + ' Years')
-    plt.xlabel('Year')
-    plt.ylabel('CPI')
-    plt.grid(True)
-    plt.xticks(years)
-    plt.tight_layout()
-    plt.show()
-
-# Example CPI values (replace this with your actual CPI data)
-cpi_values = [200, 205, 210, 215, 220, 225, 230, 235, 240]
-
-# Number of past years to plot
-n = 5
-
-# Plot the CPI for the past n years
-plot_cpi_past_n_years(cpi_values, n)
+    def __init__(self) -> None:
+        key = self.lib.get_api_key("fred")
+        os.environ["FRED_API_KEY"] = key
+        self.fred.env_api_key_found()
 
 
-def get_cpi_data(year):
-    """
-    Get CPI data for a specific year from the United States Bureau of Labor Statistics (BLS) API.
+    def menu(self):
+        while True:
+            resp = int(input(self.menu_options))
+            match resp:
+                case 0:
+                    return
+                case 1:
+                    self.get_GDP()
 
-    Args:
-    - year (int): The year for which to retrieve CPI data.
+                               
+    def get_GDP(self):
+        if input("Do you just want the latest data (y/n)? ").lower() == "y":
+            data = self.fred.get_series_latest_release('GDP')
+            print(data.tail())
+        else:
+            dt = input("For which date do you want GDP data? ")
+            print(self.fred.get_series_as_of_date('GDP', dt))
 
-    Returns:
-    - float: The CPI value for the specified year.
-    """
-    # BLS API endpoint for CPI data
-    url = f"https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0/{year}"
 
-    try:
-        # Fetch CPI data from the BLS API
-        response = requests.get(url)
-        data = response.json()
 
-        # Extract CPI value from the response
-        cpi_value = data['Results']['series'][0]['data'][0]['value']
+class Charts:
+    def plot_cpi(self, cpi_values:list,years:list):
+        """
+        Plot the CPI values for each year for the past n years.
 
-        return float(cpi_value)
+        Args:
+        - cpi_values (list): A list of CPI values for each year.
+        """
+        # Extract the data for the past n years
+        n = len(cpi_values)
+        # years = range(2022 - n + 1, 2022 + 1)
+        cpi_values_past_n_years = cpi_values[-n:]
 
-    except Exception as e:
-        print(f"Error retrieving CPI data: {e}")
-        return None
+        # Plotting the data
+        plt.figure(figsize=(10, 6))
+        plt.plot(years, cpi_values_past_n_years, marker='o', linestyle='-')
+        plt.title('Consumer Price Index (CPI) for the Past ' + str(n) + ' Years')
+        plt.xlabel('Year')
+        plt.ylabel('CPI')
+        plt.grid(True)
+        plt.xticks(years)
+        plt.tight_layout()
+        plt.show()
 
-# Example usage:
-year = 2022
-cpi_value = get_cpi_data(year)
 
-if cpi_value is not None:
-    print(f"The CPI value for {year} is: {cpi_value}")
-else:
-    print("Failed to retrieve CPI data.")
+class GetData:
+    lib = Lib()
+
+    def get_cpi_data(self, year:int)->float:
+        """
+        Get CPI data for a specific year from the United States Bureau of Labor Statistics (BLS) API.
+
+        Args:
+        - year (int): The year for which to retrieve CPI data.
+
+        Returns:
+        - float: The CPI value for the specified year.
+        """
+        # BLS API endpoint for CPI data
+        url = f"https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0/{year}"
+
+        try:
+            # Fetch CPI data from the BLS API
+            response = requests.get(url)
+            data = response.json()
+
+            # Extract CPI value from the response
+            cpi_value = data['Results']['series'][0]['data'][0]['value']
+
+            return float(cpi_value)
+
+        except Exception as e:
+            print(f"Error retrieving CPI data: {e}")
+            return None
+        
+
+    def get_ppi_data(self, year:int)->float:
+        """Personal Consumption Expenditures
+
+        Args:
+            year (int): Year for which data you want
+
+        Returns:
+            float: PPI value for given year
+        """
+        url = f"https://api.bls.gov/publicAPI/v2/timeseries/data/PCU{year}0000{year}"
+
+        try:
+            response = requests.get(url)
+            data = response.json()
+            ppi_value = data['Results']['series'][0]['data'][0]['value']
+            return float(ppi_value)
+        except Exception as e:
+            print(f"Error retrieving PPI data: {e}")
+            return None
+    
+    def get_pce_data(self, year:int)->float:
+        """Personal Consumption Expenditures)
+
+        Args:
+            year (int): Year for which data you want
+
+        Returns:
+            float: PCE value for given year
+        """
+        api_key = self.lib.get_api_key("bea")
+        url = f"https://apps.bea.gov/api/data?&UserID={api_key}&method=GetData&DataSetName=NIPA&TableName=T10105&LineCode=1&Frequency=A&Year={year}&ResultFormat=JSON"
+
+        try:
+            response = requests.get(url)
+            data = response.json()
+
+            pce_value = data['BEAAPI']['Results']['Data'][0]['DataValue']
+
+            return float(pce_value)
+
+        except Exception as e:
+            print(f"Error retrieving PCE data: {e}")
+            return None
+
+
+charts = Charts()
+data = GetData()
+def update():
+    # get data
+    nu_years = int(input("How many years' data do you want? "))
+    curr_yr = date.today().year
+    pci = []
+    pce = []
+    ppi = []
+    start_yr = curr_yr - nu_years
+    years = []
+    while start_yr < curr_yr + 1:
+        pci.append(data.get_cpi_data(start_yr))
+        pce.append(data.get_pce_data(start_yr))
+        ppi.append(data.get_ppi_data(start_yr))
+        years.append(start_yr)
+        start_yr += 1
+    # create graphs
+
+    # FRED
